@@ -19,6 +19,7 @@ interface Result {
   userTransferAnswer: string;
   transfer: string[];
   transferCorrect: boolean;
+  isSkipped?: boolean; // 标记是否为跳过查看答案
 }
 
 interface PlayerScore {
@@ -270,6 +271,45 @@ function App() {
       setUserAnswer("");
       setUserTransferAnswer("");
       setResult(null);
+    }
+  };
+
+  // 跳过本站（大家默契同意看答案，都不算错）
+  const handleSkipStation = () => {
+    if (selectedLine && players.length > 0) {
+      const currentStation = selectedLine.stations[currentStationIndex];
+
+      // 显示正确答案
+      setResult({
+        correct: true, // 标记为正确，这样显示时会有正确的样式
+        stationName: currentStation.name,
+        userAnswer: "",
+        userTransferAnswer: "",
+        transfer: currentStation.transfer,
+        transferCorrect: true,
+        isSkipped: true, // 标记为跳过查看答案
+      });
+
+      // 清除当前站点的所有答题记录，这样就不会计入任何玩家的错误
+      setPlayerStationAnswers(prev => {
+        const newMap = new Map(prev);
+        players.forEach((_, playerIdx) => {
+          const answerKey = `${playerIdx}-${currentStationIndex}`;
+          newMap.delete(answerKey);
+        });
+        return newMap;
+      });
+
+      // 延迟进入下一站，让玩家看到答案
+      setTimeout(() => {
+        if (currentStationIndex < selectedLine.stations.length - 1) {
+          setCurrentStationIndex(prev => prev + 1);
+          setCurrentPlayerIndex(0); // 重置到第一个玩家
+        }
+        setUserAnswer("");
+        setUserTransferAnswer("");
+        setResult(null);
+      }, 5000); // 5秒后自动进入下一站
     }
   };
 
@@ -761,7 +801,11 @@ function App() {
                         result.correct ? "text-green-800" : "text-red-800"
                       }`}
                     >
-                      {result.correct ? "回答正确！" : "回答错误"}
+                      {result.isSkipped
+                        ? "查看答案"
+                        : result.correct
+                        ? "回答正确！"
+                        : "回答错误"}
                     </p>
                     {result.correct ? (
                       <>
@@ -831,12 +875,20 @@ function App() {
               </div>
             )}
 
-            <button
-              className="px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-600 cursor-pointer text-xs sm:text-sm transition-all duration-300 hover:bg-gray-50 w-full"
-              onClick={handleRestart}
-            >
-              重新开始游戏
-            </button>
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+              <button
+                className="px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-600 cursor-pointer text-xs sm:text-sm transition-all duration-300 hover:bg-gray-50 flex-1"
+                onClick={handleSkipStation}
+              >
+                ⏭️ 跳过本站（查看答案）
+              </button>
+              <button
+                className="px-4 py-2 border border-gray-300 rounded-lg bg-white text-gray-600 cursor-pointer text-xs sm:text-sm transition-all duration-300 hover:bg-gray-50 flex-1"
+                onClick={handleRestart}
+              >
+                重新开始游戏
+              </button>
+            </div>
           </div>
         </div>
       </div>
