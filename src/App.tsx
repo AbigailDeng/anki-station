@@ -167,13 +167,9 @@ function App() {
 
   // 提交答案
   const handleSubmitAnswer = () => {
-    if (
-      !userAnswer.trim() ||
-      !userTransferAnswer.trim() ||
-      !selectedLine ||
-      players.length === 0
-    )
-      return;
+    if (!userAnswer.trim() || !selectedLine || players.length === 0) return;
+
+    const currentStation = selectedLine.stations[currentStationIndex];
 
     // 检查当前玩家是否已经答对了当前站点
     const answerKey = `${currentPlayerIndex}-${currentStationIndex}`;
@@ -181,7 +177,6 @@ function App() {
       return; // 已经答对了，不允许重复提交
     }
 
-    const currentStation = selectedLine.stations[currentStationIndex];
     const isStationCorrect = userAnswer.trim() === currentStation.name;
 
     // 判断换乘线路是否正确
@@ -1156,7 +1151,7 @@ function App() {
 
                   <div className="mt-3">
                     <p className="text-sm sm:text-base text-gray-800 font-medium mb-2">
-                      请输入换乘线路（多个线路用逗号或空格分隔，无换乘请输入"无"）：
+                      请输入换乘线路（多个线路用逗号或空格分隔，无换乘可不填）：
                     </p>
                     <input
                       id="transfer-input"
@@ -1165,22 +1160,18 @@ function App() {
                       value={userTransferAnswer}
                       onChange={e => setUserTransferAnswer(e.target.value)}
                       onKeyPress={e => {
-                        if (
-                          e.key === "Enter" &&
-                          userAnswer.trim() &&
-                          userTransferAnswer.trim()
-                        ) {
+                        if (e.key === "Enter" && userAnswer.trim()) {
                           handleSubmitAnswer();
                         }
                       }}
-                      placeholder="例如：2号线,3号线 或 无"
+                      placeholder="例如：2号线,3号线 或无换乘可不填"
                     />
                   </div>
 
                   <button
                     className="w-full mt-3 px-4 py-3 sm:py-4 text-base sm:text-lg border-none rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 text-white cursor-pointer transition-all duration-300 font-medium hover:from-indigo-600 hover:to-purple-700 hover:-translate-y-0.5 hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                     onClick={handleSubmitAnswer}
-                    disabled={!userAnswer.trim() || !userTransferAnswer.trim()}
+                    disabled={!userAnswer.trim()}
                   >
                     {currentPlayer.name} 提交答案
                   </button>
