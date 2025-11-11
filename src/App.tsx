@@ -16,7 +16,9 @@ interface Result {
   correct: boolean;
   stationName: string;
   userAnswer: string;
+  userTransferAnswer: string;
   transfer: string[];
+  transferCorrect: boolean;
 }
 
 interface PlayerScore {
@@ -40,10 +42,15 @@ function App() {
   const [currentPlayerIndex, setCurrentPlayerIndex] = useState<number>(0); // 当前答题的玩家索引
   const [currentStationIndex, setCurrentStationIndex] = useState<number>(0);
   const [userAnswer, setUserAnswer] = useState<string>("");
+  const [userTransferAnswer, setUserTransferAnswer] = useState<string>("");
   const [result, setResult] = useState<Result | null>(null);
   const [answeredStations, setAnsweredStations] = useState<Set<number>>(
     new Set()
   );
+  // 跟踪每个玩家对每个站点的答题情况：key为"playerIndex-stationIndex"，value为是否答对
+  const [playerStationAnswers, setPlayerStationAnswers] = useState<
+    Map<string, boolean>
+  >(new Map());
 
   // 计时器
   useEffect(() => {
@@ -88,8 +95,10 @@ function App() {
     initializePlayers(playerCount);
     setCurrentStationIndex(0);
     setUserAnswer("");
+    setUserTransferAnswer("");
     setResult(null);
     setAnsweredStations(new Set());
+    setPlayerStationAnswers(new Map());
     setGameStage(GAME_STAGES.QUIZ);
   };
 
@@ -104,8 +113,10 @@ function App() {
     initializePlayers(playerCount);
     setCurrentStationIndex(0);
     setUserAnswer("");
+    setUserTransferAnswer("");
     setResult(null);
     setAnsweredStations(new Set());
+    setPlayerStationAnswers(new Map());
     setGameStage(GAME_STAGES.QUIZ);
   };
 
@@ -117,8 +128,10 @@ function App() {
     setGameStage(GAME_STAGES.MEMORIZE);
     setCurrentStationIndex(0);
     setUserAnswer("");
+    setUserTransferAnswer("");
     setResult(null);
     setAnsweredStations(new Set());
+    setPlayerStationAnswers(new Map());
   };
 
   // 重新开始
@@ -130,8 +143,10 @@ function App() {
     setCurrentPlayerIndex(0);
     setCurrentStationIndex(0);
     setUserAnswer("");
+    setUserTransferAnswer("");
     setResult(null);
     setAnsweredStations(new Set());
+    setPlayerStationAnswers(new Map());
   };
 
   // 返回配置
@@ -151,16 +166,65 @@ function App() {
 
   // 提交答案
   const handleSubmitAnswer = () => {
-    if (!userAnswer.trim() || !selectedLine || players.length === 0) return;
+    if (
+      !userAnswer.trim() ||
+      !userTransferAnswer.trim() ||
+      !selectedLine ||
+      players.length === 0
+    )
+      return;
+
+    // 检查当前玩家是否已经答对了当前站点
+    const answerKey = `${currentPlayerIndex}-${currentStationIndex}`;
+    if (playerStationAnswers.get(answerKey) === true) {
+      return; // 已经答对了，不允许重复提交
+    }
 
     const currentStation = selectedLine.stations[currentStationIndex];
-    const isCorrect = userAnswer.trim() === currentStation.name;
+    const isStationCorrect = userAnswer.trim() === currentStation.name;
+
+    // 判断换乘线路是否正确
+    const userAnswerLower = userTransferAnswer.trim().toLowerCase();
+    const userTransferLines =
+      userAnswerLower === "无" || userAnswerLower === ""
+        ? []
+        : userTransferAnswer
+            .trim()
+            .split(/[，,、\s]+/)
+            .map(t =>
+              t
+                .trim()
+                .replace(/号线$/, "")
+                .replace(/^线/, "")
+                .replace(/^号/, "")
+            )
+            .filter(t => t.trim() && t !== "无");
+
+    const correctTransferLines = currentStation.transfer.map(t =>
+      t.trim().replace(/号线$/, "").replace(/^线/, "").replace(/^号/, "")
+    );
+
+    const isTransferCorrect =
+      currentStation.transfer.length === 0
+        ? userTransferLines.length === 0 ||
+          userAnswerLower === "无" ||
+          userAnswerLower === ""
+        : userTransferLines.length === correctTransferLines.length &&
+          userTransferLines.every(line =>
+            correctTransferLines.includes(line)
+          ) &&
+          correctTransferLines.every(line => userTransferLines.includes(line));
+
+    // 站点和换乘都答对才算正确
+    const isCorrect = isStationCorrect && isTransferCorrect;
 
     setResult({
       correct: isCorrect,
       stationName: currentStation.name,
       userAnswer: userAnswer.trim(),
+      userTransferAnswer: userTransferAnswer.trim(),
       transfer: currentStation.transfer,
+      transferCorrect: isTransferCorrect,
     });
 
     // 更新当前玩家的得分
@@ -178,25 +242,33 @@ function App() {
       )
     );
 
+    // 记录当前玩家对当前站点的答题情况
+    setPlayerStationAnswers(prev => {
+      const newMap = new Map(prev);
+      newMap.set(answerKey, isCorrect);
+      return newMap;
+    });
+
     setAnsweredStations(prev => new Set([...prev, currentStationIndex]));
   };
 
-  // 切换到下一个玩家（答对或答错都切换）
+  // 切换到下一个玩家或下一站
   const handleNextPlayer = () => {
     if (selectedLine && result && players.length > 0) {
-      // 切换到下一个玩家
-      const nextPlayerIndex = (currentPlayerIndex + 1) % players.length;
-      setCurrentPlayerIndex(nextPlayerIndex);
-
-      // 如果所有玩家都答过了，进入下一个站点
-      if (
-        nextPlayerIndex === 0 &&
-        currentStationIndex < selectedLine.stations.length - 1
-      ) {
-        setCurrentStationIndex(prev => prev + 1);
+      // 如果当前玩家答对了，进入下一站
+      if (result.correct) {
+        if (currentStationIndex < selectedLine.stations.length - 1) {
+          setCurrentStationIndex(prev => prev + 1);
+          setCurrentPlayerIndex(0); // 重置到第一个玩家
+        }
+      } else {
+        // 如果答错了，切换到下一个玩家
+        const nextPlayerIndex = (currentPlayerIndex + 1) % players.length;
+        setCurrentPlayerIndex(nextPlayerIndex);
       }
 
       setUserAnswer("");
+      setUserTransferAnswer("");
       setResult(null);
     }
   };
@@ -206,6 +278,7 @@ function App() {
     if (currentStationIndex > 0) {
       setCurrentStationIndex(prev => prev - 1);
       setUserAnswer("");
+      setUserTransferAnswer("");
       setResult(null);
     }
   };
@@ -214,6 +287,7 @@ function App() {
   const handleJumpToStation = (index: number) => {
     setCurrentStationIndex(index);
     setUserAnswer("");
+    setUserTransferAnswer("");
     setResult(null);
   };
 
@@ -536,8 +610,6 @@ function App() {
     const isLastStation =
       currentStationIndex === selectedLine.stations.length - 1;
     const currentPlayer = players[currentPlayerIndex];
-    const allPlayersAnswered =
-      result && currentPlayerIndex === players.length - 1;
 
     return (
       <div className="min-h-screen flex items-center justify-center p-3 sm:p-5">
@@ -630,17 +702,40 @@ function App() {
                     onChange={e => setUserAnswer(e.target.value)}
                     onKeyPress={e => {
                       if (e.key === "Enter" && userAnswer.trim()) {
-                        handleSubmitAnswer();
+                        document.getElementById("transfer-input")?.focus();
                       }
                     }}
                     placeholder={`${currentPlayer.name} 输入站点名称`}
                     autoFocus
                   />
 
+                  <div className="mt-3">
+                    <p className="text-sm sm:text-base text-gray-800 font-medium mb-2">
+                      请输入换乘线路（多个线路用逗号或空格分隔，无换乘请输入"无"）：
+                    </p>
+                    <input
+                      id="transfer-input"
+                      type="text"
+                      className="p-3 sm:p-4 text-base sm:text-lg border-2 border-gray-300 rounded-xl w-full transition-all duration-300 focus:outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
+                      value={userTransferAnswer}
+                      onChange={e => setUserTransferAnswer(e.target.value)}
+                      onKeyPress={e => {
+                        if (
+                          e.key === "Enter" &&
+                          userAnswer.trim() &&
+                          userTransferAnswer.trim()
+                        ) {
+                          handleSubmitAnswer();
+                        }
+                      }}
+                      placeholder="例如：2号线,3号线 或 无"
+                    />
+                  </div>
+
                   <button
-                    className="w-full px-4 py-3 sm:py-4 text-base sm:text-lg border-none rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 text-white cursor-pointer transition-all duration-300 font-medium hover:from-indigo-600 hover:to-purple-700 hover:-translate-y-0.5 hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full mt-3 px-4 py-3 sm:py-4 text-base sm:text-lg border-none rounded-xl bg-gradient-to-r from-indigo-500 to-purple-600 text-white cursor-pointer transition-all duration-300 font-medium hover:from-indigo-600 hover:to-purple-700 hover:-translate-y-0.5 hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                     onClick={handleSubmitAnswer}
-                    disabled={!userAnswer.trim()}
+                    disabled={!userAnswer.trim() || !userTransferAnswer.trim()}
                   >
                     {currentPlayer.name} 提交答案
                   </button>
@@ -676,16 +771,36 @@ function App() {
                             {result.stationName}
                           </strong>
                         </p>
-                        {result.transfer.length > 0 && (
-                          <p className="text-xs sm:text-sm text-gray-600 mt-2">
-                            换乘线路: {result.transfer.join(", ")}
+                        {result.transfer.length > 0 ? (
+                          <p className="text-sm sm:text-base my-1 text-gray-800">
+                            换乘线路:{" "}
+                            <strong className="text-indigo-600">
+                              {result.transfer.join(", ")}
+                            </strong>
+                          </p>
+                        ) : (
+                          <p className="text-sm sm:text-base my-1 text-gray-800">
+                            换乘线路:{" "}
+                            <strong className="text-indigo-600">无</strong>
                           </p>
                         )}
                       </>
                     ) : (
-                      <p className="text-sm sm:text-base my-1 text-gray-800">
-                        你的答案: {result.userAnswer}
-                      </p>
+                      <>
+                        <p className="text-sm sm:text-base my-1 text-gray-800">
+                          你的答案: {result.userAnswer}
+                        </p>
+                        <p className="text-sm sm:text-base my-1 text-gray-800">
+                          你的换乘答案: {result.userTransferAnswer || "未填写"}
+                        </p>
+                        {!result.transferCorrect && (
+                          <p className="text-xs text-red-600 mt-1">
+                            {result.userAnswer === result.stationName
+                              ? "站点名称正确，但换乘线路错误"
+                              : "换乘线路错误"}
+                          </p>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>
@@ -694,11 +809,11 @@ function App() {
 
             {result && (
               <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
-                {allPlayersAnswered && isLastStation ? (
+                {result.correct && isLastStation ? (
                   <div className="flex-1 px-4 py-3 sm:py-4 text-base sm:text-lg border-none rounded-xl bg-gradient-to-r from-green-500 to-emerald-600 text-white text-center font-medium">
-                    恭喜！所有玩家已完成所有站点 🎉
+                    恭喜！已完成所有站点 🎉
                   </div>
-                ) : allPlayersAnswered ? (
+                ) : result.correct ? (
                   <button
                     className="flex-1 px-4 py-3 sm:py-4 text-base sm:text-lg border-none rounded-xl bg-gradient-to-r from-green-500 to-emerald-600 text-white cursor-pointer transition-all duration-300 font-medium hover:from-green-600 hover:to-emerald-700 hover:-translate-y-0.5 hover:shadow-md"
                     onClick={handleNextPlayer}
@@ -707,14 +822,10 @@ function App() {
                   </button>
                 ) : (
                   <button
-                    className={`flex-1 px-4 py-3 sm:py-4 text-base sm:text-lg border-none rounded-xl text-white cursor-pointer transition-all duration-300 font-medium hover:-translate-y-0.5 hover:shadow-md ${
-                      result.correct
-                        ? "bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700"
-                        : "bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700"
-                    }`}
+                    className="flex-1 px-4 py-3 sm:py-4 text-base sm:text-lg border-none rounded-xl bg-gradient-to-r from-orange-500 to-red-600 text-white cursor-pointer transition-all duration-300 font-medium hover:from-orange-600 hover:to-red-700 hover:-translate-y-0.5 hover:shadow-md"
                     onClick={handleNextPlayer}
                   >
-                    {result.correct ? "下一位玩家 →" : "下一位玩家（答错了）→"}
+                    下一位玩家（答错了）→
                   </button>
                 )}
               </div>
