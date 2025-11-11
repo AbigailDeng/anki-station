@@ -719,6 +719,411 @@ function App() {
             站
           </p>
 
+          {/* 地铁路线图 */}
+          {(() => {
+            // 判断是否是环形线路（首尾站点相同）
+            const isCircular =
+              selectedLine.stations.length > 0 &&
+              selectedLine.stations[0].name ===
+                selectedLine.stations[selectedLine.stations.length - 1].name;
+
+            if (isCircular) {
+              // 环形线路：圆形显示
+              return (
+                <div className="mb-4 sm:mb-6 relative flex items-center justify-center">
+                  <div
+                    className="relative"
+                    style={{
+                      width: "100%",
+                      maxWidth: "500px",
+                      aspectRatio: "1",
+                    }}
+                  >
+                    {/* 圆形线路和站点标记 */}
+                    <svg
+                      className="absolute inset-0 w-full h-full"
+                      viewBox="0 0 400 400"
+                      style={{ transform: "rotate(-90deg)" }}
+                    >
+                      {/* 圆形线路 */}
+                      <circle
+                        cx="200"
+                        cy="200"
+                        r="150"
+                        fill="none"
+                        stroke={selectedLine.color}
+                        strokeWidth="10"
+                        className="opacity-70"
+                      />
+
+                      {/* 站点标记 */}
+                      {selectedLine.stations
+                        .slice(0, -1)
+                        .map((station, mapIndex) => {
+                          const originalIndex = mapIndex; // 环形线路中，最后一个站点是重复的，所以使用mapIndex
+                          const angle =
+                            (mapIndex * 360) /
+                              (selectedLine.stations.length - 1) -
+                            90; // 从顶部开始
+                          const radian = (angle * Math.PI) / 180;
+                          const radius = 150;
+                          const centerX = 200;
+                          const centerY = 200;
+                          const x = centerX + radius * Math.cos(radian);
+                          const y = centerY + radius * Math.sin(radian);
+
+                          // 检查是否答对
+                          const isAnsweredCorrectly = Array.from(
+                            { length: players.length },
+                            (_, playerIdx) => {
+                              const answerKey = `${playerIdx}-${originalIndex}`;
+                              return (
+                                playerStationAnswers.get(answerKey) === true
+                              );
+                            }
+                          ).some(Boolean);
+
+                          // 检查是否有玩家正在答题
+                          const isCurrentStation =
+                            originalIndex === currentStationIndex;
+                          const hasPlayerAnswering =
+                            isCurrentStation && !result;
+
+                          return (
+                            <g
+                              key={originalIndex}
+                              transform={`translate(${x}, ${y})`}
+                            >
+                              {/* 站点圆圈 */}
+                              <circle
+                                cx="0"
+                                cy="0"
+                                r={isAnsweredCorrectly ? "12" : "10"}
+                                fill={
+                                  isAnsweredCorrectly
+                                    ? selectedLine.color
+                                    : "#f3f4f6"
+                                }
+                                stroke={
+                                  hasPlayerAnswering
+                                    ? "#3b82f6"
+                                    : isAnsweredCorrectly
+                                    ? selectedLine.color
+                                    : "#d1d5db"
+                                }
+                                strokeWidth={
+                                  hasPlayerAnswering
+                                    ? "3"
+                                    : isAnsweredCorrectly
+                                    ? "2.5"
+                                    : "2"
+                                }
+                                className="transition-all"
+                              />
+
+                              {/* 换乘标识 */}
+                              {station.transfer.length > 0 && (
+                                <circle
+                                  cx="0"
+                                  cy="0"
+                                  r="18"
+                                  fill="none"
+                                  stroke="#fbbf24"
+                                  strokeWidth="2.5"
+                                  className="opacity-90"
+                                />
+                              )}
+
+                              {/* 站点名称方框（在圆圈旁边） */}
+                              <g
+                                transform={`translate(${
+                                  Math.cos(radian) * 25
+                                }, ${Math.sin(radian) * 25})`}
+                              >
+                                {isAnsweredCorrectly ? (
+                                  // 答对：显示站点名字的方框
+                                  <>
+                                    <rect
+                                      x="-8"
+                                      y="-20"
+                                      width="16"
+                                      height="40"
+                                      fill="#10b981"
+                                      rx="3"
+                                      stroke={
+                                        hasPlayerAnswering ? "#3b82f6" : "none"
+                                      }
+                                      strokeWidth={
+                                        hasPlayerAnswering ? "2" : "0"
+                                      }
+                                    />
+                                    <text
+                                      x="0"
+                                      y="0"
+                                      textAnchor="middle"
+                                      dominantBaseline="middle"
+                                      className="text-white font-bold"
+                                      style={{ fontSize: "10px" }}
+                                      transform="rotate(90)"
+                                    >
+                                      {station.name}
+                                    </text>
+                                  </>
+                                ) : (
+                                  // 未答对：显示问号的红色方框
+                                  <>
+                                    <rect
+                                      x="-10"
+                                      y="-16"
+                                      width="20"
+                                      height="32"
+                                      fill="#ef4444"
+                                      rx="3"
+                                      stroke={
+                                        hasPlayerAnswering ? "#3b82f6" : "none"
+                                      }
+                                      strokeWidth={
+                                        hasPlayerAnswering ? "2" : "0"
+                                      }
+                                    />
+                                    <text
+                                      x="0"
+                                      y="0"
+                                      textAnchor="middle"
+                                      dominantBaseline="middle"
+                                      className="text-white font-bold"
+                                      style={{
+                                        fontSize: "14px",
+                                        fontWeight: "bold",
+                                      }}
+                                    >
+                                      ?
+                                    </text>
+                                  </>
+                                )}
+                              </g>
+                            </g>
+                          );
+                        })}
+                    </svg>
+                  </div>
+
+                  {/* 中心标题 */}
+                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                    <div className="text-center">
+                      <div
+                        className="text-lg sm:text-xl font-bold mb-1 px-3 py-1 rounded-lg inline-block"
+                        style={{
+                          backgroundColor: selectedLine.color,
+                          color: "white",
+                        }}
+                      >
+                        {selectedLine.name}
+                      </div>
+                      <p className="text-xs sm:text-sm text-gray-600 mt-1">
+                        答题阶段
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              );
+            } else {
+              // 非环形线路：不封口的圆弧显示
+              return (
+                <div className="mb-4 sm:mb-6 relative flex items-center justify-center">
+                  <div
+                    className="relative"
+                    style={{
+                      width: "100%",
+                      maxWidth: "500px",
+                      aspectRatio: "1",
+                    }}
+                  >
+                    {/* 圆弧线路和站点标记 */}
+                    <svg
+                      className="absolute inset-0 w-full h-full"
+                      viewBox="0 0 400 400"
+                      style={{ transform: "rotate(-90deg)" }}
+                    >
+                      {/* 不封口的圆弧线路 */}
+                      {(() => {
+                        // 计算圆弧的起始和结束角度（留出一些空间，不封口）
+                        const startAngle = 45; // 从右上角开始
+                        const endAngle = 315; // 到左上角结束（不闭合）
+                        const angleRange = endAngle - startAngle;
+                        const radius = 150;
+                        const centerX = 200;
+                        const centerY = 200;
+
+                        // 计算起始和结束点
+                        const startRadian = (startAngle * Math.PI) / 180;
+                        const endRadian = (endAngle * Math.PI) / 180;
+                        const startX = centerX + radius * Math.cos(startRadian);
+                        const startY = centerY + radius * Math.sin(startRadian);
+                        const endX = centerX + radius * Math.cos(endRadian);
+                        const endY = centerY + radius * Math.sin(endRadian);
+
+                        // 使用path绘制圆弧
+                        const largeArcFlag = angleRange > 180 ? 1 : 0;
+                        const path = `M ${startX} ${startY} A ${radius} ${radius} 0 ${largeArcFlag} 1 ${endX} ${endY}`;
+
+                        return (
+                          <path
+                            d={path}
+                            fill="none"
+                            stroke={selectedLine.color}
+                            strokeWidth="10"
+                            className="opacity-70"
+                          />
+                        );
+                      })()}
+
+                      {/* 站点标记 */}
+                      {selectedLine.stations.map((station, index) => {
+                        const totalStations = selectedLine.stations.length;
+                        // 计算站点在圆弧上的位置
+                        const startAngle = 45;
+                        const endAngle = 315;
+                        const angleRange = endAngle - startAngle;
+                        const angle =
+                          startAngle +
+                          (index * angleRange) / (totalStations - 1);
+                        const radian = (angle * Math.PI) / 180;
+                        const radius = 150;
+                        const centerX = 200;
+                        const centerY = 200;
+                        const x = centerX + radius * Math.cos(radian);
+                        const y = centerY + radius * Math.sin(radian);
+
+                        // 检查是否答对
+                        const isAnsweredCorrectly = Array.from(
+                          { length: players.length },
+                          (_, playerIdx) => {
+                            const answerKey = `${playerIdx}-${index}`;
+                            return playerStationAnswers.get(answerKey) === true;
+                          }
+                        ).some(Boolean);
+
+                        // 检查是否有玩家正在答题
+                        const isCurrentStation = index === currentStationIndex;
+                        const hasPlayerAnswering = isCurrentStation && !result;
+
+                        return (
+                          <g key={index} transform={`translate(${x}, ${y})`}>
+                            {/* 站点圆圈 */}
+                            <circle
+                              cx="0"
+                              cy="0"
+                              r={isAnsweredCorrectly ? "12" : "10"}
+                              fill={
+                                isAnsweredCorrectly
+                                  ? selectedLine.color
+                                  : "#f3f4f6"
+                              }
+                              stroke={
+                                hasPlayerAnswering
+                                  ? "#3b82f6"
+                                  : isAnsweredCorrectly
+                                  ? selectedLine.color
+                                  : "#d1d5db"
+                              }
+                              strokeWidth={
+                                hasPlayerAnswering
+                                  ? "3"
+                                  : isAnsweredCorrectly
+                                  ? "2.5"
+                                  : "2"
+                              }
+                              className="transition-all"
+                            />
+
+                            {/* 换乘标识 */}
+                            {station.transfer.length > 0 && (
+                              <circle
+                                cx="0"
+                                cy="0"
+                                r="18"
+                                fill="none"
+                                stroke="#fbbf24"
+                                strokeWidth="2.5"
+                                className="opacity-90"
+                              />
+                            )}
+
+                            {/* 站点名称方框（在圆圈旁边） */}
+                            <g
+                              transform={`translate(${Math.cos(radian) * 25}, ${
+                                Math.sin(radian) * 25
+                              })`}
+                            >
+                              {isAnsweredCorrectly ? (
+                                // 答对：显示站点名字的方框
+                                <>
+                                  <rect
+                                    x="-8"
+                                    y="-20"
+                                    width="16"
+                                    height="40"
+                                    fill="#10b981"
+                                    rx="3"
+                                    stroke={
+                                      hasPlayerAnswering ? "#3b82f6" : "none"
+                                    }
+                                    strokeWidth={hasPlayerAnswering ? "2" : "0"}
+                                  />
+                                  <text
+                                    x="0"
+                                    y="0"
+                                    textAnchor="middle"
+                                    dominantBaseline="middle"
+                                    className="text-white font-bold"
+                                    style={{ fontSize: "10px" }}
+                                    transform="rotate(90)"
+                                  >
+                                    {station.name}
+                                  </text>
+                                </>
+                              ) : (
+                                // 未答对：显示问号的红色方框
+                                <>
+                                  <rect
+                                    x="-10"
+                                    y="-16"
+                                    width="20"
+                                    height="32"
+                                    fill="#ef4444"
+                                    rx="3"
+                                    stroke={
+                                      hasPlayerAnswering ? "#3b82f6" : "none"
+                                    }
+                                    strokeWidth={hasPlayerAnswering ? "2" : "0"}
+                                  />
+                                  <text
+                                    x="0"
+                                    y="0"
+                                    textAnchor="middle"
+                                    dominantBaseline="middle"
+                                    className="text-white font-bold"
+                                    style={{
+                                      fontSize: "14px",
+                                      fontWeight: "bold",
+                                    }}
+                                  >
+                                    ?
+                                  </text>
+                                </>
+                              )}
+                            </g>
+                          </g>
+                        );
+                      })}
+                    </svg>
+                  </div>
+                </div>
+              );
+            }
+          })()}
+
           <div className="flex flex-col gap-4 sm:gap-5">
             <div className="flex flex-col gap-3 sm:gap-4">
               {!result ? (
