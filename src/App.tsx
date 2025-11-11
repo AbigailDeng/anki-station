@@ -285,12 +285,12 @@ function App() {
         isSkipped: true, // 标记为跳过查看答案
       });
 
-      // 清除当前站点的所有答题记录，这样就不会计入任何玩家的错误
+      // 将所有玩家对当前站点的答题记录标记为正确，这样会显示在地铁线路图上
       setPlayerStationAnswers(prev => {
         const newMap = new Map(prev);
         players.forEach((_, playerIdx) => {
           const answerKey = `${playerIdx}-${currentStationIndex}`;
-          newMap.delete(answerKey);
+          newMap.set(answerKey, true); // 标记为答对，这样会显示在地铁线路图上
         });
         return newMap;
       });
